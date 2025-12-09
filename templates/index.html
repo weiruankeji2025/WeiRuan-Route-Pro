@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeiRuan Network Matrix</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #020205;
+            --panel-bg: rgba(10, 15, 30, 0.85);
+            --neon-blue: #00f3ff;
+            --neon-pink: #ff0055;
+            --neon-green: #00ff9d;
+            --text-main: #e0e6ed;
+            --border-color: rgba(0, 243, 255, 0.3);
+        }
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                linear-gradient(rgba(0, 20, 40, 0.9), rgba(0, 5, 10, 0.9)),
+                url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop');
+            background-size: cover;
+            background-attachment: fixed;
+            color: var(--text-main);
+            font-family: 'Segoe UI', 'Roboto Mono', monospace;
+            min-height: 100vh;
+        }
+        /* 玻璃拟态卡片 */
+        .cyber-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(12px);
+            border-radius: 4px;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        /* 装饰角标 */
+        .cyber-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 20px; height: 2px;
+            background: var(--neon-blue);
+            box-shadow: 0 0 10px var(--neon-blue);
+        }
+        .cyber-card::after {
+            content: '';
+            position: absolute;
+            bottom: 0; right: 0;
+            width: 20px; height: 2px;
+            background: var(--neon-blue);
+            box-shadow: 0 0 10px var(--neon-blue);
+        }
+
+        h1, h4, h5 { text-transform: uppercase; letter-spacing: 2px; }
+        .text-neon-blue { color: var(--neon-blue); text-shadow: 0 0 5px var(--neon-blue); }
+        .text-neon-green { color: var(--neon-green); text-shadow: 0 0 5px var(--neon-green); }
+        
+        /* 终端窗口 */
+        #terminal {
+            font-family: 'Consolas', monospace;
+            background: #000;
+            border: 1px solid #333;
+            height: 500px;
+            overflow-y: auto;
+            padding: 15px;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #ccc;
+            border-left: 3px solid var(--neon-green);
+        }
+        .log-line { margin: 0; border-bottom: 1px solid #111; padding: 2px 0; }
+        .log-hop { color: var(--neon-blue); font-weight: bold; }
+        .log-ip { color: #fff; }
+        .log-loc { color: var(--neon-green); }
+
+        /* 节点按钮 */
+        .node-btn {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid #333;
+            color: #888;
+            transition: 0.3s;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+        .node-btn:hover, .node-btn.active {
+            background: rgba(0, 243, 255, 0.1);
+            border-color: var(--neon-blue);
+            color: #fff;
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+        }
+
+        /* Ping 延迟球 */
+        .ping-orb {
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            background: #555;
+        }
+        .ping-good { background: var(--neon-green); box-shadow: 0 0 10px var(--neon-green); }
+        .ping-avg { background: #ffaa00; box-shadow: 0 0 10px #ffaa00; }
+        .ping-bad { background: var(--neon-pink); box-shadow: 0 0 10px var(--neon-pink); }
+    </style>
+</head>
+<body class="py-4">
+
+<div class="container">
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h1 class="text-neon-blue"><i class="fas fa-satellite-dish"></i> WeiRuan Network Matrix</h1>
+            <p class="mb-0 text-muted">VPS Route Visualization & Diagnostics System // 威软科技监控终端</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="cyber-card p-2 d-inline-block">
+                <small class="text-muted d-block">HOST STATUS</small>
+                <span class="text-white fw-bold"><i class="fas fa-server"></i> ONLINE</span>
+                <span class="ms-2 text-neon-green" id="local-latency">Ping: -- ms</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-3 mb-4">
+            <div class="cyber-card p-3 h-100">
+                <h5 class="text-white mb-3"><i class="fas fa-globe"></i> Target Nodes</h5>
+                <div class="accordion" id="nodeAccordion">
+                    {% for group in nodes %}
+                    <div class="mb-3">
+                        <small class="text-uppercase text-muted fw-bold">{{ group.group }}</small>
+                        <div class="mt-2 d-grid gap-2">
+                            {% for node in group.nodes %}
+                            <button class="btn node-btn btn-sm" onclick="startTrace('{{ node.ip }}', '{{ node.name }}', this)">
+                                <i class="fas fa-network-wired"></i> {{ node.name }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-9">
+            <div class="cyber-card p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="text-white m-0"><i class="fas fa-terminal"></i> Console Output <span id="target-name" class="text-neon-blue ms-2"></span></h5>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="clearTerm()">Clear</button>
+                </div>
+                <div id="terminal">
+                    <div class="text-muted">System initialized. Waiting for command...</div>
+                    <div class="text-muted">Host OS: {{ sys_info.os }} {{ sys_info.release }}</div>
+                </div>
+            </div>
+
+            <div class="mt-4 cyber-card p-3">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h5 class="text-white"><i class="fas fa-arrow-circle-down"></i> 去程测试 (Inbound)</h5>
+                        <p class="text-muted small mb-0">去程由您的本地网络决定。上方 "HOST STATUS" 显示的是您当前浏览器到此 VPS 的实时延迟。</p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <a href="https://tools.ipip.net/traceroute.php" target="_blank" class="btn btn-outline-light btn-sm">使用 IPIP.net 详测去程</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const terminal = document.getElementById('terminal');
+    let eventSource = null;
+
+    // 1. 本地 Ping 模拟 (计算 HTTP 握手时间)
+    async function checkLatency() {
+        const start = Date.now();
+        try {
+            await fetch(window.location.href, { method: 'HEAD', cache: 'no-cache' });
+            const duration = Date.now() - start;
+            const el = document.getElementById('local-latency');
+            el.innerText = `Latency: ${duration} ms`;
+            el.className = duration < 100 ? 'ms-2 text-neon-green' : (duration < 200 ? 'ms-2 text-warning' : 'ms-2 text-danger');
+        } catch (e) {
+            console.log('Ping failed');
+        }
+    }
+    setInterval(checkLatency, 2000);
+    checkLatency();
+
+    // 2. 路由追踪逻辑
+    function startTrace(ip, name, btn) {
+        // UI Reset
+        document.querySelectorAll('.node-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('target-name').innerText = `// TARGET: ${name} (${ip})`;
+        
+        if (eventSource) eventSource.close();
+        
+        terminal.innerHTML += `<div class="mt-3 text-warning">>>> Initiating trace to ${ip}...</div>`;
+        terminal.scrollTop = terminal.scrollHeight;
+
+        // 使用 EventSource 接收流式数据
+        eventSource = new EventSource(`/stream_trace?ip=${ip}`);
+
+        eventSource.onmessage = function(e) {
+            // 简单的格式化，NextTrace 的输出包含很多 ANSI 颜色，这里做基础清洗或保留
+            // 为了简化，我们直接显示文本，可以配合 CSS 进一步美化
+            const line = document.createElement('div');
+            line.className = 'log-line';
+            line.innerText = e.data;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        };
+
+        eventSource.onerror = function() {
+            eventSource.close();
+            terminal.innerHTML += `<div class="text-danger">>>> Connection closed.</div>`;
+        };
+    }
+
+    function clearTerm() {
+        terminal.innerHTML = '<div class="text-muted">Console cleared.</div>';
+    }
+</script>
+</body>
+</html>
